@@ -11,6 +11,9 @@ import (
 	"text/template"
 )
 
+// Global variables
+var updatedTime time.Time
+
 func main() {
 	http.HandleFunc("/", defaultHandler)
 	http.HandleFunc("/delay", delayHandler)
@@ -18,8 +21,9 @@ func main() {
 	http.HandleFunc("/sampleResponse", sampleResponseHandler)
 	http.HandleFunc("/addHeader", addHeaderHandler)
 	http.HandleFunc("/dumpRequest", dumpRequestHandler)
+	http.HandleFunc("/cacheTest", cacheTestHandler)
 
-	http.ListenAndServe(":8090", nil)
+	http.ListenAndServe(":8089", nil)
 }
 
 func defaultHandler(rw http.ResponseWriter, req *http.Request) {
@@ -59,7 +63,15 @@ func dumpRequestHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(requestAsString(req))
 }
 
-
+func cacheTestHandler(rw http.ResponseWriter, req *http.Request) {
+	if time.Since(updatedTime) > (time.Duration(time.Minute)) {
+		updatedTime = time.Now()
+		addHeader(rw, "Cache-Control", "max-age=10,must-revalidate")
+		rw.Write(requestAsString(req))
+	} else {
+		setResponseStatus(304, rw)
+	}
+}
 
 // Helper Methods
 
