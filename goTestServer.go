@@ -19,35 +19,43 @@ var modTime time.Time
 var Logger *log.Logger
 
 func main() {
+	// init logger
+	logFile, _ := os.Create("goServerLog.log")
+	Logger = log.New(logFile, "INFO: ", log.Ldate|log.Ltime)
+
 	http.HandleFunc("/", defaultHandler)
 	http.HandleFunc("/delay", delayHandler)
 	http.HandleFunc("/returnStatus", returnStatusHandler)
 	http.HandleFunc("/sampleResponse", sampleResponseHandler)
 	http.HandleFunc("/addHeader", addHeaderHandler)
 	http.HandleFunc("/dumpRequest", dumpRequestHandler)
-	http.HandleFunc("/cacheTest", cacheTestHandler)
+	http.HandleFunc("/cacheTests/", cacheTestHandler)
 	http.HandleFunc("/getContent/", contentHandler)
 
 	http.ListenAndServe(":8089", nil)
 }
 
 func defaultHandler(rw http.ResponseWriter, req *http.Request) {
+	Logger.Println("defaultHandler called")
 	var mainTemplate, _ = template.ParseFiles("main.html")
 	mainTemplate.Execute(rw, nil)
 }
 
 func delayHandler(rw http.ResponseWriter, req *http.Request) {
+	Logger.Println("delayHandler called")
 	sleepString := retrieveParam(req, "sleep")
 	sleepTime, _ := time.ParseDuration(sleepString + "ms")
 	delay(sleepTime)
 }
 
 func returnStatusHandler(rw http.ResponseWriter, req *http.Request) {
+	Logger.Println("returnStatusHandler called")
 	statusCode, _ := strconv.Atoi(retrieveParam(req, "status"))
 	setResponseStatus(statusCode, rw)
 }
 
 func sampleResponseHandler(rw http.ResponseWriter, req *http.Request) {
+	Logger.Println("sampleResponseHandler called")
 	duration, error := time.ParseDuration(retrieveParam(req, "time"))
 	latency, _ := time.ParseDuration(retrieveParam(req, "latency"))
 	if error == nil {
@@ -59,26 +67,26 @@ func sampleResponseHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func addHeaderHandler(rw http.ResponseWriter, req *http.Request) {
+	Logger.Println("addHeaderHandler called")
 	name := retrieveParam(req, "name")
 	value := retrieveParam(req, "value")
 	addHeader(rw, name, value)
 }
 
 func dumpRequestHandler(rw http.ResponseWriter, req *http.Request) {
+	Logger.Println("dumpRequestHandler called")
 	rw.Write(requestAsString(req))
 }
 
 func cacheTestHandler(rw http.ResponseWriter, req *http.Request) {
-	if time.Since(updatedTime) > (time.Duration(time.Minute)) {
-		updatedTime = time.Now()
-		addHeader(rw, "Cache-Control", "max-age=10,must-revalidate")
-		rw.Write(requestAsString(req))
-	} else {
-		setResponseStatus(304, rw)
-	}
+	Logger.Println("cacheTestHandler called")
+	addHeader(rw, "Cache-Control", "max-age=10,must-revalidate")
+	contentHandler(rw, req)
+	modTime = time.Now()
 }
 
 func contentHandler(rw http.ResponseWriter, req *http.Request) {
+	Logger.Println("contentHandler called")
 	fileName := req.URL.Path[12:]
 	if fileName == "" {
 		fileName = "sampleData.json"
