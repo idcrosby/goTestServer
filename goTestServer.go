@@ -9,10 +9,14 @@ import (
 	"bytes"
 	"strconv"
 	"text/template"
+	"log"
+	"os"
 )
 
 // Global variables
 var updatedTime time.Time
+var modTime time.Time
+var Logger *log.Logger
 
 func main() {
 	http.HandleFunc("/", defaultHandler)
@@ -22,6 +26,7 @@ func main() {
 	http.HandleFunc("/addHeader", addHeaderHandler)
 	http.HandleFunc("/dumpRequest", dumpRequestHandler)
 	http.HandleFunc("/cacheTest", cacheTestHandler)
+	http.HandleFunc("/getContent/", contentHandler)
 
 	http.ListenAndServe(":8089", nil)
 }
@@ -73,11 +78,28 @@ func cacheTestHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func contentHandler(rw http.ResponseWriter, req *http.Request) {
+	fileName := req.URL.Path[12:]
+	if fileName == "" {
+		fileName = "sampleData.json"
+	}
+	fi, err := os.Open(fileName)
+	if err != nil { 
+		rw.WriteHeader(404)
+		return
+	}
+	defer func() {
+		if err := fi.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	http.ServeContent(rw, req, "sampleData", modTime, fi)
+}
+
 // Helper Methods
 
 // Retreive parameters passed in via query or post body
 func retrieveParam(req *http.Request, param string) string {
-	
 	params, _ := url.ParseQuery(req.URL.RawQuery)
 	value := params[param]
 
