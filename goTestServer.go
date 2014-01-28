@@ -15,7 +15,7 @@ import (
 
 // Global variables
 var updatedTime time.Time
-var modTime time.Time
+var modTime time.Time = time.Now()
 var Logger *log.Logger
 
 func main() {
@@ -56,8 +56,8 @@ func returnStatusHandler(rw http.ResponseWriter, req *http.Request) {
 
 func sampleResponseHandler(rw http.ResponseWriter, req *http.Request) {
 	Logger.Println("sampleResponseHandler called")
-	duration, error := time.ParseDuration(retrieveParam(req, "time"))
-	latency, _ := time.ParseDuration(retrieveParam(req, "latency"))
+	duration, error := time.ParseDuration(retrieveParam(req, "time") + "ms")
+	latency, _ := time.ParseDuration(retrieveParam(req, "latency") + "ms")
 	if error == nil {
 		outputDotsByTime(duration, latency, rw)
 	} else {
@@ -80,9 +80,8 @@ func dumpRequestHandler(rw http.ResponseWriter, req *http.Request) {
 
 func cacheTestHandler(rw http.ResponseWriter, req *http.Request) {
 	Logger.Println("cacheTestHandler called")
-	addHeader(rw, "Cache-Control", "max-age=10,must-revalidate")
+	addHeader(rw, "Cache-Control", "max-age=10")
 	contentHandler(rw, req)
-	modTime = time.Now()
 }
 
 func contentHandler(rw http.ResponseWriter, req *http.Request) {
@@ -147,6 +146,9 @@ func getCookiesAsString(request *http.Request) []byte {
 func requestAsString(request *http.Request) []byte {
 	var buffer bytes.Buffer
 	buffer.WriteString("\n")
+	buffer.WriteString("Current Time: ")
+	buffer.WriteString(time.Now().String())
+	buffer.WriteString("\n")
 	buffer.WriteString("HTTP Method: ")
 	buffer.WriteString(request.Method)
 	buffer.WriteString("\n")
@@ -192,7 +194,7 @@ func outputDotsByTime(duration, latency time.Duration, rw http.ResponseWriter) {
 //  optional latency between dots 
 func outputDotsBySize(size int, latency time.Duration, rw http.ResponseWriter) {
 	if _, ok := rw.(http.Flusher); ok {
-		fmt.Println("flusher is valid")
+		// fmt.Println("flusher is valid")
 	}
 	for i := 0; i < size; i++ {
 		fmt.Fprintf(rw, ".")
