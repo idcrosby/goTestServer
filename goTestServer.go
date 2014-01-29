@@ -11,6 +11,7 @@ import (
 	"text/template"
 	"log"
 	"os"
+	"encoding/json"
 )
 
 // Global variables
@@ -31,6 +32,7 @@ func main() {
 	http.HandleFunc("/dumpRequest", dumpRequestHandler)
 	http.HandleFunc("/cacheTests/", cacheTestHandler)
 	http.HandleFunc("/getContent/", contentHandler)
+	http.HandleFunc("/validateJson", validateJsonHandler)
 
 	http.ListenAndServe(":8089", nil)
 }
@@ -101,6 +103,19 @@ func contentHandler(rw http.ResponseWriter, req *http.Request) {
 		}
 	}()
 	http.ServeContent(rw, req, "sampleData", modTime, fi)
+}
+
+func validateJsonHandler(rw http.ResponseWriter, req *http.Request) {
+	Logger.Println("validateJsonHandler called.")
+	var buffer bytes.Buffer
+	buffer.ReadFrom(req.Body)
+	// rw.Write(validateJson(req.Body))
+	jsonData := validateJson(buffer.Bytes())
+	if jsonData == nil {
+		rw.WriteHeader(400)
+	} else {
+		rw.Write(jsonData)
+	}
 }
 
 // Helper Methods
@@ -210,3 +225,16 @@ func setResponseStatus(statusCode int, rw http.ResponseWriter) {
 	rw.WriteHeader(statusCode)
 }
 
+// Verify the JSON post body is valid
+//  return formatted JSON if it is valid
+// func validateJson(body io.Reader) (buf []byte) {
+func validateJson(bytes []byte) (buf []byte) {
+	var f interface{}
+	err := json.Unmarshal(bytes, &f)
+	if err != nil {
+		fmt.Printf("Error reading Json")
+		return nil
+	}
+	buf, _ = json.MarshalIndent(&f, "", "   ")
+	return
+}
