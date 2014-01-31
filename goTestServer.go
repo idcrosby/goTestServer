@@ -12,19 +12,25 @@ import (
 	"log"
 	"os"
 	"encoding/json"
+	"flag"
 )
 
 // Global variables
 var updatedTime time.Time
 var modTime time.Time = time.Now()
-var Logger *log.Logger
+var InfoLog *log.Logger
 var ErrorLog *log.Logger
+var Verbose bool
 
 func main() {
+	// Define flags
+	flag.BoolVar(&Verbose, "verbose", false, "Turn on verbose logging.")
+	flag.Parse()
+
 	// init loggers
 	logFile, _ := os.Create("goServerLog.log")
 	errorFile, _ := os.Create("goErrorLog.log")
-	Logger = log.New(logFile, "INFO: ", log.Ldate|log.Ltime)
+	InfoLog = log.New(logFile, "INFO: ", log.Ldate|log.Ltime)
 	ErrorLog = log.New(errorFile, "ERROR: ", log.Ldate|log.Ltime)
 
 	http.HandleFunc("/", errorHandler(defaultHandler))
@@ -41,14 +47,14 @@ func main() {
 }
 
 func defaultHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("defaultHandler called")
+	InfoLog.Println("defaultHandler called")
 	var mainTemplate, err = template.ParseFiles("main.html")
 	check(err)
 	mainTemplate.Execute(rw, nil)
 }
 
 func delayHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("delayHandler called")
+	InfoLog.Println("delayHandler called")
 	sleepString := retrieveParam(req, "sleep")
 	sleepTime, err := time.ParseDuration(sleepString + "ms")
 	check(err)
@@ -56,14 +62,14 @@ func delayHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func returnStatusHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("returnStatusHandler called")
+	InfoLog.Println("returnStatusHandler called")
 	statusCode, err := strconv.Atoi(retrieveParam(req, "status"))
 	check(err)
 	setResponseStatus(statusCode, rw)
 }
 
 func sampleResponseHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("sampleResponseHandler called")
+	InfoLog.Println("sampleResponseHandler called")
 	duration, error := time.ParseDuration(retrieveParam(req, "time") + "ms")
 	latency, err := time.ParseDuration(retrieveParam(req, "latency") + "ms")
 	check(err)
@@ -77,25 +83,25 @@ func sampleResponseHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func addHeaderHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("addHeaderHandler called")
+	InfoLog.Println("addHeaderHandler called")
 	name := retrieveParam(req, "name")
 	value := retrieveParam(req, "value")
 	addHeader(rw, name, value)
 }
 
 func dumpRequestHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("dumpRequestHandler called")
+	InfoLog.Println("dumpRequestHandler called")
 	rw.Write(requestAsString(req))
 }
 
 func cacheTestHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("cacheTestHandler called")
+	InfoLog.Println("cacheTestHandler called")
 	addHeader(rw, "Cache-Control", "max-age=10")
 	contentHandler(rw, req)
 }
 
 func contentHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("contentHandler called")
+	InfoLog.Println("contentHandler called")
 	fileName := req.URL.Path[12:]
 	if fileName == "" {
 		fileName = "sampleData.json"
@@ -114,10 +120,9 @@ func contentHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func validateJsonHandler(rw http.ResponseWriter, req *http.Request) {
-	Logger.Println("validateJsonHandler called.")
+	InfoLog.Println("validateJsonHandler called.")
 	var buffer bytes.Buffer
 	buffer.ReadFrom(req.Body)
-	// rw.Write(validateJson(req.Body))
 	jsonData := validateJson(buffer.Bytes())
 	if jsonData == nil {
 		rw.WriteHeader(400)
@@ -129,6 +134,9 @@ func validateJsonHandler(rw http.ResponseWriter, req *http.Request) {
 // Error Handler Wrapper
 func errorHandler(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		if Verbose {
+			InfoLog.Println(string(requestAsString(req)[:]))
+		}
 		defer func() {
 			if e, ok := recover().(error); ok {
 				w.WriteHeader(500)
