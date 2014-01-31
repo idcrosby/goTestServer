@@ -18,52 +18,60 @@ import (
 var updatedTime time.Time
 var modTime time.Time = time.Now()
 var Logger *log.Logger
+var ErrorLog *log.Logger
 
 func main() {
-	// init logger
+	// init loggers
 	logFile, _ := os.Create("goServerLog.log")
+	errorFile, _ := os.Create("goErrorLog.log")
 	Logger = log.New(logFile, "INFO: ", log.Ldate|log.Ltime)
+	ErrorLog = log.New(errorFile, "ERROR: ", log.Ldate|log.Ltime)
 
-	http.HandleFunc("/", defaultHandler)
-	http.HandleFunc("/delay", delayHandler)
-	http.HandleFunc("/returnStatus", returnStatusHandler)
-	http.HandleFunc("/sampleResponse", sampleResponseHandler)
-	http.HandleFunc("/addHeader", addHeaderHandler)
-	http.HandleFunc("/dumpRequest", dumpRequestHandler)
-	http.HandleFunc("/cacheTests/", cacheTestHandler)
-	http.HandleFunc("/getContent/", contentHandler)
-	http.HandleFunc("/validateJson", validateJsonHandler)
+	http.HandleFunc("/", errorHandler(defaultHandler))
+	http.HandleFunc("/delay", errorHandler(delayHandler))
+	http.HandleFunc("/returnStatus", errorHandler(returnStatusHandler))
+	http.HandleFunc("/sampleResponse", errorHandler(sampleResponseHandler))
+	http.HandleFunc("/addHeader", errorHandler(addHeaderHandler))
+	http.HandleFunc("/dumpRequest", errorHandler(dumpRequestHandler))
+	http.HandleFunc("/cacheTests/", errorHandler(cacheTestHandler))
+	http.HandleFunc("/getContent/", errorHandler(contentHandler))
+	http.HandleFunc("/validateJson", errorHandler(validateJsonHandler))
 
 	http.ListenAndServe(":8089", nil)
 }
 
 func defaultHandler(rw http.ResponseWriter, req *http.Request) {
 	Logger.Println("defaultHandler called")
-	var mainTemplate, _ = template.ParseFiles("main.html")
+	var mainTemplate, err = template.ParseFiles("main.html")
+	check(err)
 	mainTemplate.Execute(rw, nil)
 }
 
 func delayHandler(rw http.ResponseWriter, req *http.Request) {
 	Logger.Println("delayHandler called")
 	sleepString := retrieveParam(req, "sleep")
-	sleepTime, _ := time.ParseDuration(sleepString + "ms")
+	sleepTime, err := time.ParseDuration(sleepString + "ms")
+	check(err)
 	delay(sleepTime)
 }
 
 func returnStatusHandler(rw http.ResponseWriter, req *http.Request) {
 	Logger.Println("returnStatusHandler called")
-	statusCode, _ := strconv.Atoi(retrieveParam(req, "status"))
+	statusCode, err := strconv.Atoi(retrieveParam(req, "status"))
+	check(err)
 	setResponseStatus(statusCode, rw)
 }
 
 func sampleResponseHandler(rw http.ResponseWriter, req *http.Request) {
 	Logger.Println("sampleResponseHandler called")
 	duration, error := time.ParseDuration(retrieveParam(req, "time") + "ms")
-	latency, _ := time.ParseDuration(retrieveParam(req, "latency") + "ms")
+	latency, err := time.ParseDuration(retrieveParam(req, "latency") + "ms")
+	check(err)
 	if error == nil {
 		outputDotsByTime(duration, latency, rw)
 	} else {
-		size, _ := strconv.Atoi(retrieveParam(req, "size"))
+		size, err := strconv.Atoi(retrieveParam(req, "size"))
+		check(err)
 		outputDotsBySize(size, latency, rw)
 	}
 }
@@ -118,11 +126,27 @@ func validateJsonHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// Error Handler Wrapper
+func errorHandler(fn http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			if e, ok := recover().(error); ok {
+				w.WriteHeader(500)
+				ErrorLog.Println(e)
+			}
+		}()
+		fn(w, req)
+	}
+}
+
+func check(err error) { if err != nil { panic(err) } }
+
 // Helper Methods
 
 // Retreive parameters passed in via query or post body
 func retrieveParam(req *http.Request, param string) string {
-	params, _ := url.ParseQuery(req.URL.RawQuery)
+	params, err := url.ParseQuery(req.URL.RawQuery)
+	check(err)
 	value := params[param]
 
 	if len(value) < 1 {
@@ -172,7 +196,8 @@ func requestAsString(request *http.Request) []byte {
 	buffer.Write(getHeadersAsString(request.Header))
 	buffer.WriteString("\n")
 	buffer.WriteString("Request Body: \n\n")
-	requestBytes, _ := httputil.DumpRequest(request, true)
+	requestBytes, err := httputil.DumpRequest(request, true)
+	check(err)
 	buffer.Write(requestBytes)
 
 	return buffer.Bytes()
@@ -235,6 +260,7 @@ func validateJson(bytes []byte) (buf []byte) {
 		fmt.Printf("Error reading Json")
 		return nil
 	}
-	buf, _ = json.MarshalIndent(&f, "", "   ")
+	buf, err = json.MarshalIndent(&f, "", "   ")
+	check(err)
 	return
 }
