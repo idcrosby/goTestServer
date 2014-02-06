@@ -13,6 +13,7 @@ import (
 	"os"
 	"encoding/json"
 	"flag"
+	"strings"
 )
 
 // Global variables
@@ -84,9 +85,11 @@ func sampleResponseHandler(rw http.ResponseWriter, req *http.Request) {
 
 func addHeaderHandler(rw http.ResponseWriter, req *http.Request) {
 	InfoLog.Println("addHeaderHandler called")
-	name := retrieveParam(req, "name")
-	value := retrieveParam(req, "value")
-	addHeader(rw, name, value)
+	names := strings.Split(retrieveParam(req, "name"), ",")
+	values := strings.Split(retrieveParam(req, "value"), ",")
+	for count, _ := range names {
+		addHeader(rw, names[count], values[count])
+	}
 }
 
 func dumpRequestHandler(rw http.ResponseWriter, req *http.Request) {
